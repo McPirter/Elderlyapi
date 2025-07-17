@@ -3,6 +3,7 @@ const router = express.Router();
 const { hashPassword, verifyPassword } = require("../utils/encryption");
 const {generarToken} = require("../utils/token");
 const User = require("../models/Musuario"); // Asegúrate de que el modelo sea correcto
+const Adulto = require("../models/Madulto");
 
 // Ruta de registro
 router.post("/register", async (req, res) => {
@@ -37,11 +38,15 @@ router.post("/login", async (req, res) => {
             await user.save();
         }
 
+        const adulto = await Adulto.findOne({ usuario: user._id });
+
         res.status(200).json({
             message: "Usuario encontrado",
             tempToken,
             tokenPermanente,
-            rol: user.roluser
+            rol: user.roluser,
+            userId: user._id,
+            adultoId: adulto ? adulto._id : null
         });
 
     } catch (error) {
