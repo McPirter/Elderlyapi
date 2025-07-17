@@ -38,7 +38,7 @@ router.get("/info-adulto/:id", async (req, res) => {
 
         // Buscar el adulto y poblar el usuario asociado
         const adulto = await Adulto.findById(adultoId)
-            .populate({path: "userId",
+            .populate({path: "usuario",
                 select: "nombre correo"})
             .select("nombre edad lim_presion lim_tiempo_cuarto userId")
             .lean(); // Usar lean() para obtener un objeto JavaScript simple
