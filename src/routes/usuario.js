@@ -54,5 +54,16 @@ router.post("/login", async (req, res) => {
     }
 });
 
+// src/routes/adulto.js
+router.get("/por-usuario/:userId", async (req, res) => {
+    try {
+        const adultos = await Adulto.find({ usuario: req.params.userId });
+        res.status(200).json(adultos);
+    } catch (error) {
+        res.status(500).json({ message: "Error al obtener adultos", error: error.message });
+    }
+});
+
+
 
 module.exports = router;
