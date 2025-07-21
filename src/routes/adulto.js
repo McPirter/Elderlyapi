@@ -111,40 +111,81 @@ router.get("/info-temp/:id", async (req, res) => {
 
 
 //Ruta para registrar y obtener el medicamento
-router.post("/registrar-medicamento", async (req, res) =>{
+// Registrar nuevo recordatorio
+router.post('/registrar-medicamento', async (req, res) => {
     try {
-        const{adulto, fecha, medicina, descripcion, tiempo} = req.body;
+        const { adulto, medicina, descripcion, tiempo } = req.body;
 
-        const existeAdulto = await Adulto.findById(adulto);
-         if (!existeAdulto) {
-            return res.status(400).json({message: "El adulto no existe"});
-         }
-
-        const nuevoMedic = new Medic({adulto, fecha, medicina, descripcion, tiempo});
-        await nuevoMedic.save();
-        
-        res.status(201).json({error: "Medicamento registrado con éxito"});
-    } catch (error) {
-        res.status(500).json({error: error.message});
-    }
-});
-
-router.get("/info-medicamento/:id", async (req, res) => {
-    try { 
-        const medicamentos = await Medic.find({adulto: req.params.id})
-            .populate("adulto", "nombre") // Solo traer campos necesarios del adulto
-            .select("fecha medicina descripcion tiempo adulto");
-
-        if (!medicamentos) {
-            return res.status(404).json({ message: "Medicamento no encontrado" });
+        // Validaciones
+        if (!mongoose.Types.ObjectId.isValid(adulto)) {
+            return res.status(400).json({ error: "ID de adulto inválido" });
         }
 
-        res.status(200).json(medicamentos);
+        if (typeof tiempo !== 'number' || tiempo <= 0) {
+            return res.status(400).json({ error: "El tiempo debe ser un número positivo" });
+        }
+
+        // Verificar existencia del adulto
+        const adultoExiste = await Adulto.findById(adulto);
+        if (!adultoExiste) {
+            return res.status(404).json({ error: "Adulto no encontrado" });
+        }
+
+        // Crear nuevo recordatorio
+        const nuevoMedicamento = new Medicamento({
+            adulto,
+            medicina,
+            descripcion,
+            tiempo
+        });
+
+        await nuevoMedicamento.save();
+        
+        res.status(201).json({
+            success: true,
+            data: nuevoMedicamento
+        });
     } catch (error) {
-        res.status(500).json({error:error.message});
+        res.status(500).json({ 
+            success: false,
+            error: "Error al registrar recordatorio",
+            details: error.message 
+        });
     }
 });
 
+// Obtener recordatorios por adulto
+router.get('/info-medicamento/:id', async (req, res) => {
+    try {
+        // Validar ID
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ error: "ID inválido" });
+        }
+
+        const medicamentos = await Medicamento.find({ adulto: req.params.id })
+            .populate('adulto', 'nombre _id')
+            .sort({ fecha: -1 });
+
+        if (!medicamentos || medicamentos.length === 0) {
+            return res.status(404).json({ 
+                success: true,
+                data: [],
+                message: "No se encontraron recordatorios" 
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            data: medicamentos
+        });
+    } catch (error) {
+        res.status(500).json({ 
+            success: false,
+            error: "Error al obtener recordatorios",
+            details: error.message 
+        });
+    }
+});
 
 
 //Ruta para registrar y obtener la ubicación
