@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const mongoose = require('mongoose');
 const Adulto = require("../models/Madulto");
 const User = require("../models/Musuario"); 
 const Temp = require("../models/Mtemperatura");

@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const mongoose = require('mongoose');
 const { hashPassword, verifyPassword } = require("../utils/encryption");
 const {generarToken} = require("../utils/token");
 const User = require("../models/Musuario"); // Asegúrate de que el modelo sea correcto
