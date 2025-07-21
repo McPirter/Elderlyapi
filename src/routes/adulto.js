@@ -117,40 +117,70 @@ router.post('/registrar-medicamento', async (req, res) => {
     try {
         const { adulto, medicina, descripcion, tiempo } = req.body;
 
-        // Validaciones
+        // Validaciones mejoradas
+        if (!adulto || !medicina || tiempo === undefined) {
+            return res.status(400).json({ 
+                success: false,
+                error: "Campos requeridos: adulto, medicina y tiempo" 
+            });
+        }
+
         if (!mongoose.Types.ObjectId.isValid(adulto)) {
-            return res.status(400).json({ error: "ID de adulto inválido" });
+            return res.status(400).json({ 
+                success: false,
+                error: "ID de adulto inválido" 
+            });
         }
 
         if (typeof tiempo !== 'number' || tiempo <= 0) {
-            return res.status(400).json({ error: "El tiempo debe ser un número positivo" });
+            return res.status(400).json({ 
+                success: false,
+                error: "El tiempo debe ser un número positivo" 
+            });
         }
 
-        // Verificar existencia del adulto
-        const adultoExiste = await Adulto.findById(adulto);
+        // Verificar existencia del adulto y obtener datos básicos
+        const adultoExiste = await Adulto.findById(adulto).select('nombre');
         if (!adultoExiste) {
-            return res.status(404).json({ error: "Adulto no encontrado" });
+            return res.status(404).json({ 
+                success: false,
+                error: "Adulto no encontrado" 
+            });
         }
 
-        // Crear nuevo recordatorio
+        // Crear nuevo medicamento
         const nuevoMedicamento = new Medic({
             adulto,
             medicina,
-            descripcion,
+            descripcion: descripcion || null,
             tiempo
         });
 
         await nuevoMedicamento.save();
         
+        // Preparar respuesta compatible con Android
+        const responseData = {
+            _id: nuevoMedicamento._id.toString(),
+            adulto: {
+                _id: adultoExiste._id.toString(),
+                nombre: adultoExiste.nombre
+            },
+            medicina: nuevoMedicamento.medicina,
+            descripcion: nuevoMedicamento.descripcion,
+            tiempo: nuevoMedicamento.tiempo,
+            fecha: nuevoMedicamento.fecha.toISOString()
+        };
+
         res.status(201).json({
             success: true,
-            data: nuevoMedicamento
+            data: responseData
         });
     } catch (error) {
+        console.error("Error en registrar-medicamento:", error);
         res.status(500).json({ 
             success: false,
             error: "Error al registrar recordatorio",
-            details: error.message 
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }
 });
