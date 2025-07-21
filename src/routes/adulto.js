@@ -187,53 +187,34 @@ router.post('/registrar-medicamento', async (req, res) => {
 });
 
 // Obtener recordatorios por adulto
-router.get('/info-medicamento/:id', async (req, res) => {
+router.get('/info-medicamento-compat/:id', async (req, res) => {
     try {
-        // Validar ID
         if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-            return res.status(400).json({
-                success: false,
-                data: [],
-                message: "ID inválido"
-            });
+            return res.status(400).json([]); // Array vacío para compatibilidad
         }
 
-        // Buscar medicamentos y poblar datos del adulto
         const medicamentos = await Medicamento.find({ adulto: req.params.id })
             .populate('adulto', 'nombre _id')
             .sort({ fecha: -1 })
             .lean();
 
-        // Formatear la respuesta para ser consistente
-        const formattedMedicamentos = medicamentos.map(med => ({
-            _id: med._id,
+        const response = medicamentos.map(med => ({
+            _id: med._id.toString(),
             medicina: med.medicina,
-            descripcion: med.descripcion || null,
+            descripcion: med.descripcion,
             tiempo: med.tiempo,
-            fecha: med.fecha.toISOString(),
+            fecha: med.fecha.getTime().toString(), // timestamp en ms como string
             adulto: {
-                _id: med.adulto._id,
+                _id: med.adulto._id.toString(),
                 nombre: med.adulto.nombre
             }
         }));
 
-        // Respuesta exitosa siempre con estructura consistente
-        res.status(200).json({
-            success: true,
-            data: formattedMedicamentos,
-            count: formattedMedicamentos.length
-        });
+        res.status(200).json(response); // Devuelve directamente el array
 
-    } catch (error) { 
-        console.error("Error en /info-medicamento:", error);
-        
-        // Respuesta de error pero manteniendo la estructura de data como array
-        res.status(500).json({
-            success: false,
-            data: [],
-            error: "Error al obtener recordatorios",
-            details: process.env.NODE_ENV === 'development' ? error.message : undefined
-        });
+    } catch (error) {
+        console.error("Error en /info-medicamento-compat:", error);
+        res.status(500).json([]); // Array vacío en caso de error
     }
 });
 
