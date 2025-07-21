@@ -178,7 +178,7 @@ router.get('/info-medicamento/:id', async (req, res) => {
             success: true,
             data: medicamentos
         });
-    } catch (error) {
+    } catch (error) { 
         res.status(500).json({ 
             success: false,
             error: "Error al obtener recordatorios",
