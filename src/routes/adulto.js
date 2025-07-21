@@ -191,29 +191,24 @@ router.get('/info-medicamento/:id', async (req, res) => {
     try {
         // Validar ID
         if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-            return res.status(400).json({ 
+            return res.status(400).json({
                 success: false,
-                error: "ID inválido" 
+                data: [],
+                message: "ID inválido"
             });
         }
 
+        // Buscar medicamentos y poblar datos del adulto
         const medicamentos = await Medicamento.find({ adulto: req.params.id })
             .populate('adulto', 'nombre _id')
-            .sort({ fecha: -1 });
+            .sort({ fecha: -1 })
+            .lean();
 
-        if (!medicamentos || medicamentos.length === 0) {
-            return res.status(200).json({  // Cambiado a 200 ya que no es realmente un error
-                success: true,
-                data: [],
-                message: "No se encontraron recordatorios" 
-            });
-        }
-
-        // Formatear los datos para la respuesta
+        // Formatear la respuesta para ser consistente
         const formattedMedicamentos = medicamentos.map(med => ({
             _id: med._id,
             medicina: med.medicina,
-            descripcion: med.descripcion,
+            descripcion: med.descripcion || null,
             tiempo: med.tiempo,
             fecha: med.fecha.toISOString(),
             adulto: {
@@ -222,14 +217,20 @@ router.get('/info-medicamento/:id', async (req, res) => {
             }
         }));
 
+        // Respuesta exitosa siempre con estructura consistente
         res.status(200).json({
             success: true,
-            data: formattedMedicamentos
+            data: formattedMedicamentos,
+            count: formattedMedicamentos.length
         });
+
     } catch (error) { 
         console.error("Error en /info-medicamento:", error);
-        res.status(500).json({ 
+        
+        // Respuesta de error pero manteniendo la estructura de data como array
+        res.status(500).json({
             success: false,
+            data: [],
             error: "Error al obtener recordatorios",
             details: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
