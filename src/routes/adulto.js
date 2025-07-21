@@ -190,7 +190,10 @@ router.get('/info-medicamento/:id', async (req, res) => {
     try {
         // Validar ID
         if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-            return res.status(400).json({ error: "ID inválido" });
+            return res.status(400).json({ 
+                success: false,
+                error: "ID inválido" 
+            });
         }
 
         const medicamentos = await Medicamento.find({ adulto: req.params.id })
@@ -198,26 +201,39 @@ router.get('/info-medicamento/:id', async (req, res) => {
             .sort({ fecha: -1 });
 
         if (!medicamentos || medicamentos.length === 0) {
-            return res.status(404).json({ 
+            return res.status(200).json({  // Cambiado a 200 ya que no es realmente un error
                 success: true,
                 data: [],
                 message: "No se encontraron recordatorios" 
             });
         }
 
+        // Formatear los datos para la respuesta
+        const formattedMedicamentos = medicamentos.map(med => ({
+            _id: med._id,
+            medicina: med.medicina,
+            descripcion: med.descripcion,
+            tiempo: med.tiempo,
+            fecha: med.fecha.toISOString(),
+            adulto: {
+                _id: med.adulto._id,
+                nombre: med.adulto.nombre
+            }
+        }));
+
         res.status(200).json({
             success: true,
-            data: medicamentos
+            data: formattedMedicamentos
         });
     } catch (error) { 
+        console.error("Error en /info-medicamento:", error);
         res.status(500).json({ 
             success: false,
             error: "Error al obtener recordatorios",
-            details: error.message 
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }
 });
-
 
 //Ruta para registrar y obtener la ubicación
 router.post("/registrar-ubicacion", async (req, res) => {
