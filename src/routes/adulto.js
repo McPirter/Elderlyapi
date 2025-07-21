@@ -8,6 +8,7 @@ const Medic = require("../models/Mmedicamento");
 const Ubicacion = require("../models/Mubicacion");
 const Gps = require("../models/Mgps");
 const Presion = require("../models/Mpresion");
+const Medicamento = require("../models/Mmedicamento");
 
 //Ruta para registrar y obtener adultos
 router.post("/registro-adulto", async (req, res) => {
