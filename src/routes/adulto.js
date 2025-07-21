@@ -133,7 +133,7 @@ router.post('/registrar-medicamento', async (req, res) => {
         }
 
         // Crear nuevo recordatorio
-        const nuevoMedicamento = new Medicamento({
+        const nuevoMedicamento = new Medic({
             adulto,
             medicina,
             descripcion,
