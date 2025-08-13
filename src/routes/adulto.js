@@ -78,35 +78,125 @@ router.get("/info-adulto/:id", async (req, res) => {
 //Rutas para registrar y obtener temperatura
 router.post("/registrar-temp", async (req, res) => {
     try {
-        const {adulto, fecha, temp} = req.body;
+        const { adulto, fecha, temp } = req.body;
 
-        const existeAdulto = await Adulto.findById(adulto);
-         if (!existeAdulto) {
-            return res.status(400).json({message: "El adulto no existe"});
-         }
+        // 1. Validaciones de campos
+        if (!adulto || temp === undefined) {
+            return res.status(400).json({
+                success: false,
+                error: "Campos requeridos: adulto y temp"
+            });
+        }
 
-        const nuevaTemp = new Temp({adulto, fecha, temp});
+        // Validar ID de adulto
+        if (!mongoose.Types.ObjectId.isValid(adulto)) {
+            return res.status(400).json({
+                success: false,
+                error: "ID de adulto inválido"
+            });
+        }
+
+        // Validar temperatura
+        if (typeof temp !== 'number' || temp <= 0) {
+            return res.status(400).json({
+                success: false,
+                error: "La temperatura debe ser un número positivo"
+            });
+        }
+
+        // 2. Verificar existencia del adulto
+        const adultoExiste = await Adulto.findById(adulto).select("nombre");
+        if (!adultoExiste) {
+            return res.status(404).json({
+                success: false,
+                error: "Adulto no encontrado"
+            });
+        }
+
+        // 3. Crear nuevo registro de temperatura
+        const nuevaTemp = new Temp({
+            adulto,
+            fecha: fecha ? new Date(fecha) : new Date(), // Si no mandan fecha, usar la actual
+            temp
+        });
+
         await nuevaTemp.save();
 
-        res.status(201).json({error: "Temperatura registrada con éxito"});
+        // 4. Preparar respuesta compatible con Android
+        const responseData = {
+            _id: nuevaTemp._id.toString(),
+            adulto: {
+                _id: adultoExiste._id.toString(),
+                nombre: adultoExiste.nombre
+            },
+            fecha: nuevaTemp.fecha.toISOString(),
+            temp: nuevaTemp.temp
+        };
+
+        res.status(201).json({
+            success: true,
+            data: responseData
+        });
+
     } catch (error) {
-        res.status(500).json({error: error.message});
+        console.error("Error en registrar-temp:", error);
+        res.status(500).json({
+            success: false,
+            error: "Error al registrar temperatura",
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
     }
 });
 
+
 router.get("/info-temp/:id", async (req, res) => {
     try {
-        const temperaturas = await Temp.find({adulto: req.params.id})
-            .populate("adulto", "nombre") // Solo traer campos necesarios del adulto
-            .select("fecha temp adulto");
+        const { id } = req.params;
 
-        if (!temperaturas) { 
-            return res.status(404).json({ message: "Adulto no encontrado" });
+        // 1. Validar ID
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({
+                success: false,
+                error: "ID de adulto inválido"
+            });
         }
 
-        res.status(200).json(temperaturas);
+        // 2. Buscar temperaturas
+        const temperaturas = await Temp.find({ adulto: id })
+            .populate("adulto", "nombre")
+            .select("fecha temp adulto")
+            .sort({ fecha: -1 });
+
+        if (!temperaturas || temperaturas.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: "No hay registros de temperatura para este adulto"
+            });
+        }
+
+        // 3. Formatear respuesta para Android
+        const data = temperaturas.map(t => ({
+            _id: t._id.toString(),
+            adulto: {
+                _id: t.adulto._id.toString(),
+                nombre: t.adulto.nombre
+            },
+            fecha: t.fecha.toISOString(),
+            temp: t.temp
+        }));
+
+        res.status(200).json({
+            success: true,
+            data
+        });
+
     } catch (error) {
-        res.status(500).json({ message: "Error al obtener los datos", error: error.message});
+        console.error("Error en info-temp:", error);
+        res.status(500).json({
+            success: false,
+            error: "Error al obtener temperaturas",
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
     }
 });
 
