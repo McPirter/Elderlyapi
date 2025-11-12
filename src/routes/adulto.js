@@ -386,16 +386,18 @@ router.get("/info-presion/:id", async (req, res) => {
 router.post("/registrar-gps", async (req, res) => {
     try {
         const {adulto, coordenadas, fecha_salida, fecha_regreso, tiempo_afuera} = req.body;
-
-        const nuevoGPS = new Gps({adulto, coordenadas, fecha_salida, fecha_regreso, tiempo_afuera});
-        await nuevoGPS.save();
-
+        
+        // --- 1. VERIFICAR PRIMERO ---
         const existeAdulto = await Adulto.findById(adulto);
          if (!existeAdulto) {
             return res.status(400).json({message: "El adulto no existe"});
          }
 
-        res.status(201).json({error: "Ubicación registrado con éxito"});
+        // --- 2. GUARDAR DESPUÉS ---
+        const nuevoGPS = new Gps({adulto, coordenadas, fecha_salida, fecha_regreso, tiempo_afuera});
+        await nuevoGPS.save();
+
+        res.status(201).json({error: "Ubicación registrada con éxito"});
     } catch (error) {
         res.status(500).json({error: error.message});
     }
