@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const UbicacionSchema = new mongoose.Schema({
-    adulto: { type: mongoose.Schema.Types.ObjectId, ref: 'Adulto', required: true },
+    adulto: { type: [mongoose.Schema.Types.ObjectId], ref: 'Adulto', required: true },
     ubi: { type: String, required: true },
     tiempo: { type: Number, required: true },
     hora_acceso: { type: Date, required: true },
