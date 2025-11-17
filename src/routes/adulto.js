@@ -311,54 +311,56 @@ router.get('/info-medicamento-compat/:id', async (req, res) => {
 //Ruta para registrar y obtener la ubicación
 router.post("/registrar-ubicacion", async (req, res) => {
     try {
-        // 1. RECIBIMOS SOLO LO BÁSICO
-        // Ya no pedimos hora_acceso ni hora_salida al ESP32
+        // Recibimos el array de IDs en 'adulto'
         const { adulto, ubi, tiempo } = req.body;
 
-        // 2. VALIDACIÓN DE DATOS
+        // 1. VALIDACIÓN BÁSICA
         if (!adulto || !ubi) {
-            return res.status(400).json({ message: "Faltan datos requeridos: adulto o ubi" });
+            return res.status(400).json({ message: "Faltan datos requeridos" });
         }
 
-        // Validar que el ID que envía el ESP32 tenga formato correcto de MongoDB
-        if (!mongoose.Types.ObjectId.isValid(adulto)) {
-            return res.status(400).json({ message: "El ID del adulto no tiene un formato válido" });
+        // Asegurarnos de que 'adulto' sea un array (si el ESP32 manda uno solo, lo convertimos)
+        const idsAdultos = Array.isArray(adulto) ? adulto : [adulto];
+
+        // 2. VALIDAR FORMATO DE LOS IDs
+        const idsValidos = idsAdultos.every(id => mongoose.Types.ObjectId.isValid(id));
+        if (!idsValidos) {
+            return res.status(400).json({ message: "Uno o más IDs no tienen formato válido" });
         }
 
-        // 3. VERIFICAR EXISTENCIA DEL ADULTO
-        const existeAdulto = await Adulto.findById(adulto);
-        if (!existeAdulto) {
-            return res.status(404).json({ message: "Adulto no encontrado en la base de datos" });
+        // 3. VERIFICAR QUE LOS ADULTOS EXISTAN
+        // Buscamos cuántos de los IDs enviados existen realmente en la colección Adulto
+        const adultosEncontrados = await Adulto.find({ _id: { $in: idsAdultos } });
+        
+        if (adultosEncontrados.length === 0) {
+             return res.status(404).json({ message: "No se encontró ningún adulto con esos IDs" });
         }
 
-        // 4. CÁLCULO DE FECHAS (Lógica del Servidor)
-        // Calculamos las fechas aquí porque el servidor tiene la hora exacta, el ESP32 no.
+        // 4. CÁLCULO DE FECHAS
         const ahora = new Date(); 
-        const duracionSegundos = tiempo || 10; // Si por error llega vacío, asumimos 10 seg
-        const salida = new Date(ahora.getTime() + (duracionSegundos * 1000)); // Sumamos segundos a la fecha actual
+        const duracionSegundos = tiempo || 10;
+        const salida = new Date(ahora.getTime() + (duracionSegundos * 1000));
 
         // 5. GUARDAR EN MONGO
+        // Nota: Guardamos solo los IDs que realmente se encontraron en la base de datos
         const nuevaUbi = new Ubicacion({
-            adulto,
+            adulto: adultosEncontrados.map(a => a._id), 
             ubi,
             tiempo: duracionSegundos,
-            hora_acceso: ahora,   // Fecha generada por el servidor
-            hora_salida: salida   // Fecha calculada por el servidor
+            hora_acceso: ahora,
+            hora_salida: salida
         });
 
         await nuevaUbi.save();
 
         res.status(201).json({ 
-            message: "Ubicación registrada con éxito", 
-            registro: {
-                adulto: existeAdulto.nombre, // Devolvemos el nombre para confirmar
-                lugar: ubi,
-                hora: ahora
-            }
+            message: "Ubicación registrada para múltiples adultos", 
+            total_registrados: adultosEncontrados.length,
+            lugar: ubi
         });
 
     } catch (error) {
-        console.error("Error al registrar ubicación:", error);
+        console.error("Error al registrar:", error);
         res.status(500).json({ error: error.message });
     }
 });
