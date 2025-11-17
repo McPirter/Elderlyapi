@@ -311,30 +311,69 @@ router.get('/info-medicamento-compat/:id', async (req, res) => {
 //Ruta para registrar y obtener la ubicación
 router.post("/registrar-ubicacion", async (req, res) => {
     try {
-        const {adulto, ubi, tiempo, hora_acceso, hora_salida} = req.body;
+        // 1. RECIBIMOS SOLO LO BÁSICO
+        // Ya no pedimos hora_acceso ni hora_salida al ESP32
+        const { adulto, ubi, tiempo } = req.body;
 
-        const nuevaUbi = new Ubicacion({adulto, ubi, tiempo, hora_acceso, hora_salida});
+        // 2. VALIDACIÓN DE DATOS
+        if (!adulto || !ubi) {
+            return res.status(400).json({ message: "Faltan datos requeridos: adulto o ubi" });
+        }
+
+        // Validar que el ID que envía el ESP32 tenga formato correcto de MongoDB
+        if (!mongoose.Types.ObjectId.isValid(adulto)) {
+            return res.status(400).json({ message: "El ID del adulto no tiene un formato válido" });
+        }
+
+        // 3. VERIFICAR EXISTENCIA DEL ADULTO
+        const existeAdulto = await Adulto.findById(adulto);
+        if (!existeAdulto) {
+            return res.status(404).json({ message: "Adulto no encontrado en la base de datos" });
+        }
+
+        // 4. CÁLCULO DE FECHAS (Lógica del Servidor)
+        // Calculamos las fechas aquí porque el servidor tiene la hora exacta, el ESP32 no.
+        const ahora = new Date(); 
+        const duracionSegundos = tiempo || 10; // Si por error llega vacío, asumimos 10 seg
+        const salida = new Date(ahora.getTime() + (duracionSegundos * 1000)); // Sumamos segundos a la fecha actual
+
+        // 5. GUARDAR EN MONGO
+        const nuevaUbi = new Ubicacion({
+            adulto,
+            ubi,
+            tiempo: duracionSegundos,
+            hora_acceso: ahora,   // Fecha generada por el servidor
+            hora_salida: salida   // Fecha calculada por el servidor
+        });
+
         await nuevaUbi.save();
 
-        const existeAdulto = await Adulto.findById(adulto);
-         if (!existeAdulto) {
-            return res.status(400).json({message: "El adulto no existe"});
-         }
+        res.status(201).json({ 
+            message: "Ubicación registrada con éxito", 
+            registro: {
+                adulto: existeAdulto.nombre, // Devolvemos el nombre para confirmar
+                lugar: ubi,
+                hora: ahora
+            }
+        });
 
-        res.status(201).json({error: "Ubicación registrada con éxito"});
     } catch (error) {
-        res.status(500).json({error: error.message});
+        console.error("Error al registrar ubicación:", error);
+        res.status(500).json({ error: error.message });
     }
 });
 
 router.get("/info-ubicacion/:id", async (req, res) => {
     try {
-        const ubicaciones = await Ubicacion.find({adulto: req.params.id})
-            .populate("adulto", "nombre") // Solo traer campos necesarios del adulto
-            .select("ubi tiempo hora_acceso hora_salida adulto");
+        // Buscamos por ID de adulto
+        const ubicaciones = await Ubicacion.find({ adulto: req.params.id })
+            .populate("adulto", "nombre") 
+            .select("ubi tiempo hora_acceso hora_salida adulto")
+            .sort({ hora_acceso: -1 }); // <--- IMPORTANTE: Ordenar del más reciente al más antiguo
 
-        if (!ubicaciones) { 
-            return res.status(404).json({ message: "Adulto no encontrado" });
+        // CORRECCIÓN: Validar si el array está vacío
+        if (ubicaciones.length === 0) { 
+            return res.status(404).json({ message: "No se encontraron registros para este adulto" });
         }
 
         res.status(200).json(ubicaciones);
